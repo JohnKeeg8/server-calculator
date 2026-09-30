@@ -1,0 +1,14 @@
+# Live tip data and its backups - never publish earnings
+data/
+
+# Runtime noise
+*.log
+npm-debug.log*
+
+# There are no dependencies, but just in case
+node_modules/
+
+# OS junk
+Thumbs.db
+desktop.ini
+.DS_Store

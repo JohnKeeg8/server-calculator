@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2b8cc4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Server Calc">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232b8cc4'/%3E%3Ctext x='32' y='45' font-size='34' text-anchor='middle' fill='%23fff' font-family='Segoe UI,Arial,sans-serif' font-weight='bold'%3E%24%3C/text%3E%3C/svg%3E">
+<title>Server Calculator</title>
+<style>
+  :root{
+    --bg:#eef7fd;
+    --bg-grad:#dceffb;
+    --surface:#ffffff;
+    --surface-2:#f5fbff;
+    --line:#cfe6f5;
+    --line-soft:#e6f2fa;
+    --brand:#2b8cc4;
+    --brand-dark:#1d6d9e;
+    --brand-deep:#155a83;
+    --brand-light:#7cc3e8;
+    --brand-wash:#e3f2fb;
+    --ink:#173a4d;
+    --ink-2:#4a6f83;
+    --ink-3:#8aa7b7;
+    --money:#0f7a5c;
+    --warn:#b5822a;
+    --warn-bg:#fdf6e7;
+    --bad:#b04141;
+    --shadow:0 1px 2px rgba(23,58,77,.05), 0 6px 20px rgba(23,58,77,.07);
+    --shadow-lift:0 -4px 28px rgba(23,58,77,.16);
+    --r:14px;
+    --safe-b:env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);
+    background:linear-gradient(175deg,var(--bg) 0%,var(--bg-grad) 100%);
+    background-attachment:fixed;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    -webkit-tap-highlight-color:transparent;
+  }
+  [hidden]{display:none !important}
+  button{font:inherit;cursor:pointer;touch-action:manipulation}
+  .tnum{font-variant-numeric:tabular-nums}
+
+  /* page shell: single column on phones, two on wide screens */
+  .wrap{
+    max-width:600px;margin:0 auto;
+    padding:14px 12px calc(96px + var(--safe-b));
+  }
+  @media (min-width:960px){
+    .wrap{max-width:1060px;padding:22px 20px 60px}
+    .cols{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:20px;align-items:start}
+  }
+
+  /* ------------------------------------------------------------- header */
+  header.top{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .logo{
+    width:36px;height:36px;border-radius:10px;flex:none;
+    background:linear-gradient(145deg,var(--brand-light),var(--brand));
+    display:grid;place-items:center;color:#fff;font-size:17px;
+    box-shadow:0 3px 10px rgba(43,140,196,.3);
+  }
+  h1{font-size:16px;margin:0;letter-spacing:-.2px;line-height:1.2}
+  .head-right{margin-left:auto;display:flex;align-items:center;gap:7px}
+  @media (min-width:960px){
+    .logo{width:42px;height:42px;font-size:20px}
+    h1{font-size:19px}
+  }
+
+  .sync{
+    display:inline-flex;align-items:center;gap:6px;
+    border:1px solid var(--line);background:var(--surface);
+    border-radius:999px;padding:6px 11px 6px 9px;font-size:12px;color:var(--ink-2);
+    transition:.15s;white-space:nowrap;
+  }
+  .sync .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-3);flex:none}
+  .sync.ok .dot{background:#2f9e6f}
+  .sync.busy .dot{background:var(--brand);animation:pulse 1s ease-in-out infinite}
+  .sync.off{background:var(--warn-bg);border-color:#efdcb4;color:var(--warn)}
+  .sync.off .dot{background:var(--warn)}
+  .sync.err{background:#fdf2f2;border-color:#e7c3c3;color:var(--bad)}
+  .sync.err .dot{background:var(--bad)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  .sync .label{display:none}
+  @media (min-width:420px){.sync .label{display:inline}}
+
+  .menu-wrap{position:relative}
+  .icon-btn{
+    width:34px;height:34px;border-radius:10px;border:1px solid var(--line);
+    background:var(--surface);color:var(--ink-2);display:grid;place-items:center;
+    font-size:17px;line-height:1;padding:0;
+  }
+  .icon-btn:hover{border-color:var(--brand-light);color:var(--brand-dark)}
+  .menu{
+    position:absolute;right:0;top:40px;z-index:30;min-width:184px;
+    background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    box-shadow:var(--shadow);padding:6px;
+  }
+  .menu button{
+    display:block;width:100%;text-align:left;border:0;background:none;
+    padding:9px 11px;border-radius:8px;font-size:14px;color:var(--ink);
+  }
+  .menu button:hover{background:var(--brand-wash);color:var(--brand-dark)}
+  .menu .sep{height:1px;background:var(--line-soft);margin:5px 4px}
+
+  /* --------------------------------------------------- running total hero */
+  .hero{
+    border-radius:16px;padding:15px 17px 16px;margin-bottom:12px;color:#fff;
+    background:linear-gradient(140deg,var(--brand) 0%,var(--brand-deep) 100%);
+    box-shadow:0 5px 18px rgba(21,90,131,.28);
+  }
+  .hero .lab{
+    font-size:11px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;
+    opacity:.85;
+  }
+  .hero .big{font-size:33px;font-weight:700;letter-spacing:-.6px;margin:3px 0 11px;line-height:1}
+  .hero .row{display:flex;gap:16px;flex-wrap:wrap}
+  .hero .m{min-width:58px}
+  .hero .m .v{font-size:15px;font-weight:600;line-height:1.2}
+  .hero .m .k{font-size:10px;letter-spacing:.06em;text-transform:uppercase;opacity:.8;margin-top:1px}
+  @media (min-width:420px){.hero .big{font-size:38px}}
+
+  /* ------------------------------------------------------------- cards */
+  .card{
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:12px;
+  }
+  .card-head{
+    display:flex;align-items:center;gap:8px;
+    padding:11px 12px;border-bottom:1px solid var(--line-soft);
+  }
+  .card-head h2{font-size:14px;margin:0;font-weight:600}
+  .card-body{padding:12px}
+  @media (min-width:960px){
+    .card-head{padding:14px 16px}
+    .card-body{padding:16px}
+  }
+
+  /* ---------------------------------------------------------- calendar */
+  #monthLabel{font-size:15px;font-weight:600;letter-spacing:-.2px}
+  .month-nav{display:flex;align-items:center;gap:5px;margin-left:auto}
+  .nav-btn{
+    width:32px;height:32px;border-radius:9px;border:1px solid var(--line);
+    background:var(--surface);color:var(--brand-dark);display:grid;place-items:center;
+    font-size:16px;line-height:1;padding:0;
+  }
+  .nav-btn:hover{background:var(--brand-wash);border-color:var(--brand-light)}
+  .today-btn{
+    border:1px solid var(--line);background:var(--surface);color:var(--brand-dark);
+    border-radius:9px;padding:0 11px;height:32px;font-size:12.5px;font-weight:500;
+  }
+  .today-btn:hover{background:var(--brand-wash);border-color:var(--brand-light)}
+
+  .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+  .dow{
+    text-align:center;font-size:10px;font-weight:700;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--ink-3);padding:1px 0 5px;
+  }
+  .day{
+    position:relative;border:1px solid var(--line-soft);background:var(--surface-2);
+    border-radius:10px;padding:4px 3px 5px;min-height:60px;
+    display:flex;flex-direction:column;align-items:center;gap:1px;
+    transition:.12s;overflow:hidden;
+  }
+  .day .num{font-size:11px;font-weight:600;color:var(--ink-3);line-height:1.25}
+  .day.out{opacity:.38}
+  .day.has{background:#fff;border-color:var(--line)}
+  .day.today{border-color:var(--brand-light)}
+  .day.today .num{
+    color:#fff;background:var(--brand);border-radius:50%;
+    width:19px;height:19px;display:grid;place-items:center;font-size:10.5px;
+  }
+  .day.sel{
+    border-color:var(--brand);background:#fff;
+    box-shadow:0 0 0 2px rgba(43,140,196,.3);
+  }
+  .day .amt{
+    font-size:13px;font-weight:700;color:var(--money);line-height:1.1;margin-top:auto;
+    font-variant-numeric:tabular-nums;
+  }
+  .day .hrs{font-size:9.5px;color:var(--ink-2);line-height:1.2}
+  .day .marks{position:absolute;top:4px;right:4px;display:flex;gap:2px}
+  .day .mk{width:5px;height:5px;border-radius:50%}
+  .day .mk.note{background:var(--brand-light)}
+  .day .mk.pend{background:var(--warn)}
+
+  /* very narrow phones (320px class): claw back horizontal space */
+  @media (max-width:359px){
+    .wrap{padding-left:8px;padding-right:8px}
+    .card-body{padding:9px}
+    .hero{padding-left:14px;padding-right:14px}
+    .cal{gap:3px}
+    .day{padding-left:2px;padding-right:2px}
+    .day .amt{font-size:12px}
+    .day .hrs{font-size:9px}
+  }
+  @media (min-width:420px){
+    .cal{gap:5px}
+    .day{min-height:66px}
+    .day .amt{font-size:14.5px}
+    .day .hrs{font-size:10.5px}
+    .day .num{font-size:11.5px}
+  }
+  @media (min-width:960px){
+    .day{min-height:76px;align-items:flex-start;padding:6px 8px 7px}
+    .day .amt{font-size:15px}
+    .day .hrs{font-size:11px}
+    .day .rate{font-size:10.5px;color:var(--brand);font-weight:600;line-height:1.2}
+  }
+  .day .rate{display:none}
+  @media (min-width:960px){.day .rate{display:block}}
+
+  .cal-hint{
+    margin-top:9px;text-align:center;font-size:11px;color:var(--ink-3);line-height:1.5;
+  }
+
+  /* ------------------------------------------------------- earnings report */
+  .stat{
+    border:1px solid var(--line-soft);border-radius:11px;padding:10px 11px;
+    margin-bottom:8px;background:var(--surface-2);
+  }
+  .stat:last-child{margin-bottom:0}
+  .stat .st-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+  .stat .st-t{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--brand)}
+  .stat .st-s{font-size:10.5px;color:var(--ink-3);text-align:right}
+  .stat .st-m{font-size:21px;font-weight:700;color:var(--money);line-height:1;font-variant-numeric:tabular-nums}
+  .metrics{display:flex;gap:14px;margin-top:7px;flex-wrap:wrap}
+  .metric .mv{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums}
+  .metric .mk{font-size:10px;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em}
+  .st-note{
+    margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);
+    font-size:12.5px;color:var(--ink-2);line-height:1.5;white-space:pre-wrap;word-break:break-word;
+  }
+
+  .weeks{margin-top:12px}
+  .weeks-t{
+    font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--ink-3);margin-bottom:6px;
+  }
+  .wrow{
+    display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:9px;
+    font-size:12.5px;border:1px solid transparent;
+  }
+  .wrow:nth-child(odd){background:var(--surface-2)}
+  .wrow.now{background:var(--brand-wash);border-color:#bfe0f3}
+  .wrow .wd{color:var(--ink-2);flex:1;min-width:0;white-space:nowrap}
+  .wrow .wt{font-weight:700;color:var(--money);font-variant-numeric:tabular-nums}
+  .wrow .wh{color:var(--ink-3);font-variant-numeric:tabular-nums;min-width:44px;text-align:right}
+  .wrow .wr{color:var(--brand-dark);font-weight:600;font-variant-numeric:tabular-nums;
+    min-width:62px;text-align:right;display:none}
+  @media (min-width:400px){.wrow .wr{display:block}}
+
+  /* --------------------------------------------------------------- FAB */
+  .fab{
+    position:fixed;z-index:40;right:14px;bottom:calc(14px + var(--safe-b));
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--brand);color:#fff;border:0;border-radius:999px;
+    padding:13px 19px 13px 15px;font-size:14.5px;font-weight:600;
+    box-shadow:0 6px 20px rgba(29,109,158,.42);
+    transition:.15s;
+  }
+  .fab:hover{background:var(--brand-dark)}
+  .fab:active{transform:scale(.97)}
+  .fab .plus{
+    font-size:19px;font-weight:400;line-height:1;width:20px;height:20px;
+    display:grid;place-items:center;border-radius:50%;background:rgba(255,255,255,.22);
+  }
+  @media (min-width:960px){.fab{right:24px;bottom:24px}}
+
+  /* ------------------------------------------------------------- sheet */
+  .sheet-wrap{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center}
+  .sheet-bg{position:absolute;inset:0;background:rgba(14,48,66,.42);animation:fade .18s ease}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .sheet{
+    position:relative;width:100%;max-width:520px;
+    background:var(--surface);border-radius:20px 20px 0 0;
+    box-shadow:var(--shadow-lift);
+    max-height:92vh;max-height:92dvh;display:flex;flex-direction:column;
+    animation:up .22s cubic-bezier(.22,.9,.3,1);
+    padding-bottom:var(--safe-b);
+  }
+  @keyframes up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  @media (min-width:700px){
+    .sheet-wrap{align-items:center}
+    .sheet{border-radius:18px;max-height:88vh;animation:pop .18s ease}
+    @keyframes pop{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}
+  }
+  .grab{width:38px;height:4px;border-radius:99px;background:var(--line);margin:9px auto 2px;flex:none}
+  @media (min-width:700px){.grab{display:none}}
+  .sheet-head{
+    display:flex;align-items:flex-start;gap:10px;padding:10px 16px 12px;
+    border-bottom:1px solid var(--line-soft);flex:none;
+  }
+  .sheet-title{font-size:16.5px;font-weight:700;letter-spacing:-.2px}
+  .sheet-sub{font-size:12px;color:var(--ink-3);margin-top:2px}
+  .sheet-x{
+    margin-left:auto;flex:none;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink-2);width:32px;height:32px;border-radius:9px;font-size:19px;line-height:1;padding:0;
+  }
+  .sheet-x:hover{background:var(--brand-wash);color:var(--brand-dark);border-color:var(--brand-light)}
+  .sheet-body{padding:14px 16px 4px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .sheet-foot{
+    display:flex;gap:9px;padding:12px 16px 14px;border-top:1px solid var(--line-soft);flex:none;
+  }
+  .sheet-foot .btn{flex:1;justify-content:center}
+
+  .live{
+    display:flex;justify-content:space-between;align-items:baseline;
+    background:var(--brand-wash);border-radius:11px;padding:10px 13px;margin-bottom:14px;
+  }
+  .live .l{font-size:11px;color:var(--ink-2);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  .live .v{font-size:18px;font-weight:700;color:var(--brand-dark);font-variant-numeric:tabular-nums}
+
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .two.wide{grid-template-columns:1fr}   /* start/end needs the full width */
+  .field{margin-bottom:13px}
+  label.lb{
+    display:block;font-size:11px;font-weight:700;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--ink-3);margin-bottom:5px;
+  }
+  .lb-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;min-height:24px}
+  .lb-row label.lb{margin:0}
+
+  /* hours-entry mode switch */
+  .seg{
+    margin-left:auto;display:inline-flex;background:var(--surface-2);
+    border:1px solid var(--line);border-radius:999px;padding:2px;flex:none;
+  }
+  .seg-b{
+    border:0;background:none;color:var(--ink-3);border-radius:999px;
+    padding:4px 11px;font-size:11.5px;font-weight:600;line-height:1.3;white-space:nowrap;
+  }
+  .seg-b.on{background:var(--brand);color:#fff}
+  .seg-b:not(.on):hover{color:var(--brand-dark)}
+
+  .times{display:flex;align-items:center;gap:8px}
+  .times .input{flex:1;min-width:0;text-align:center}
+  .times .dash{color:var(--ink-3);font-size:15px;flex:none}
+  .calc{
+    margin-top:7px;font-size:12.5px;color:var(--ink-2);line-height:1.4;
+    display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;
+  }
+  .calc .big{font-weight:700;color:var(--brand-dark);font-variant-numeric:tabular-nums}
+  .calc .tag{
+    font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    background:var(--warn-bg);color:var(--warn);border-radius:999px;padding:2px 8px;
+  }
+  .calc.empty{color:var(--ink-3)}
+  .input,textarea.input{
+    width:100%;padding:11px 12px;font:inherit;font-size:16px;color:var(--ink);
+    border:1px solid var(--line);border-radius:11px;background:var(--surface-2);
+    transition:.15s;-webkit-appearance:none;appearance:none;
+  }
+  .input:focus,textarea.input:focus{
+    outline:none;border-color:var(--brand);background:#fff;
+    box-shadow:0 0 0 3px rgba(43,140,196,.15);
+  }
+  textarea.input{resize:vertical;min-height:84px;line-height:1.5}
+  .with-pre{position:relative}
+  .with-pre .pre{
+    position:absolute;left:12px;top:50%;transform:translateY(-50%);
+    color:var(--ink-3);font-size:16px;pointer-events:none;
+  }
+  .with-pre .input{padding-left:26px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+  .chip{
+    border:1px solid var(--line);background:var(--surface);border-radius:999px;
+    padding:5px 12px;font-size:12.5px;color:var(--ink-2);
+  }
+  .chip:hover{border-color:var(--brand-light);color:var(--brand-dark);background:var(--brand-wash)}
+
+  .btn{
+    border:1px solid var(--line);background:var(--surface);color:var(--ink);
+    padding:11px 15px;border-radius:11px;font-size:14.5px;font-weight:600;transition:.15s;
+  }
+  .btn:hover{border-color:var(--brand-light);background:var(--surface-2)}
+  .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+  .btn.primary:hover{background:var(--brand-dark);border-color:var(--brand-dark)}
+  .btn.danger{color:var(--bad)}
+  .btn.danger:hover{border-color:#e7a3a3;background:#fdf2f2}
+  .btn:disabled{opacity:.45;cursor:default}
+
+  .foot{margin-top:14px;text-align:center;font-size:11px;color:var(--ink-3);line-height:1.6}
+  .toast{
+    position:fixed;left:50%;bottom:calc(84px + var(--safe-b));transform:translate(-50%,14px);
+    background:var(--ink);color:#fff;font-size:13px;padding:9px 16px;border-radius:999px;
+    opacity:0;pointer-events:none;transition:.22s;z-index:70;max-width:86vw;text-align:center;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="top">
+    <div class="logo">&#127864;</div>
+    <h1>Server Calculator</h1>
+    <div class="head-right">
+      <button class="sync" id="syncPill" title="Tap to sync now">
+        <span class="dot"></span><span class="label" id="syncText">Starting</span>
+      </button>
+      <div class="menu-wrap">
+        <button class="icon-btn" id="menuBtn" aria-label="More actions" aria-haspopup="true">&#8942;</button>
+        <div class="menu" id="menu" hidden>
+          <button id="exportBtn">Export backup</button>
+          <button id="importBtn">Import backup</button>
+          <div class="sep"></div>
+          <button id="syncNowBtn">Sync now</button>
+        </div>
+      </div>
+      <input type="file" id="fileIn" accept=".json,application/json" hidden>
+    </div>
+  </header>
+
+  <!-- running total -->
+  <div class="hero">
+    <div class="lab" id="heroLab">This month so far</div>
+    <div class="big tnum" id="heroBig">$0.00</div>
+    <div class="row">
+      <div class="m"><div class="v tnum" id="heroHours">0h</div><div class="k">Hours</div></div>
+      <div class="m"><div class="v tnum" id="heroRate">&mdash;</div><div class="k">Per hour</div></div>
+      <div class="m"><div class="v tnum" id="heroShifts">0</div><div class="k">Shifts</div></div>
+      <div class="m"><div class="v tnum" id="heroWeek">$0.00</div><div class="k">This week</div></div>
+    </div>
+  </div>
+
+  <div class="cols">
+    <!-- calendar -->
+    <section class="card">
+      <div class="card-head">
+        <h2 id="monthLabel">Month</h2>
+        <div class="month-nav">
+          <button class="today-btn" id="todayBtn">Today</button>
+          <button class="nav-btn" id="prevBtn" aria-label="Previous month">&#8249;</button>
+          <button class="nav-btn" id="nextBtn" aria-label="Next month">&#8250;</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="cal" id="cal"></div>
+        <div class="cal-hint">Tap a day to select it, then press <strong>+</strong> to log tips and hours.</div>
+      </div>
+    </section>
+
+    <!-- earnings report -->
+    <section class="card">
+      <div class="card-head"><h2>Earnings report</h2></div>
+      <div class="card-body">
+        <div id="stats"></div>
+        <div class="weeks">
+          <div class="weeks-t" id="weeksTitle">Weeks</div>
+          <div id="weekList"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="foot">Synced through your PC &middot; works offline and catches up later</div>
+</div>
+
+<!-- add / edit a day -->
+<button class="fab" id="fab"><span class="plus">+</span><span id="fabText">Add</span></button>
+
+<div class="sheet-wrap" id="sheetWrap" hidden>
+  <div class="sheet-bg" id="sheetBg"></div>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="grab"></div>
+    <div class="sheet-head">
+      <div>
+        <div class="sheet-title" id="sheetTitle">Day</div>
+        <div class="sheet-sub" id="sheetSub"></div>
+      </div>
+      <button class="sheet-x" id="sheetX" title="Save and close" aria-label="Save and close">&times;</button>
+    </div>
+    <div class="sheet-body">
+      <div class="live">
+        <span class="l">Hourly rate</span>
+        <span class="v" id="liveRate">&mdash;</span>
+      </div>
+      <div class="two" id="twoRow">
+        <div class="field">
+          <label class="lb" for="tipsIn">Tips</label>
+          <div class="with-pre">
+            <span class="pre">$</span>
+            <input class="input tnum" id="tipsIn" type="number" min="0" step="0.01"
+                   placeholder="0.00" inputmode="decimal" enterkeyhint="done">
+          </div>
+        </div>
+        <div class="field">
+          <div class="lb-row">
+            <label class="lb" for="hoursIn">Hours</label>
+            <div class="seg" role="group" aria-label="How to enter hours">
+              <button class="seg-b on" type="button" id="modeHoursBtn">Hours</button>
+              <button class="seg-b" type="button" id="modeRangeBtn">Start&ndash;end</button>
+            </div>
+          </div>
+
+          <!-- plain hours -->
+          <div id="hoursBox">
+            <input class="input tnum" id="hoursIn" type="number" min="0" step="0.25"
+                   placeholder="0.00" inputmode="decimal" enterkeyhint="done">
+            <div class="chips">
+              <button class="chip" type="button" data-h="4">4</button>
+              <button class="chip" type="button" data-h="5">5</button>
+              <button class="chip" type="button" data-h="6">6</button>
+              <button class="chip" type="button" data-h="8">8</button>
+            </div>
+          </div>
+
+          <!-- clock in / clock out -->
+          <div id="rangeBox" hidden>
+            <div class="times">
+              <input class="input" id="startIn" type="time" aria-label="Start time">
+              <span class="dash">&ndash;</span>
+              <input class="input" id="endIn" type="time" aria-label="End time">
+            </div>
+            <div class="calc empty" id="calcOut">Enter a start and end time</div>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="lb" for="noteIn">Notes</label>
+        <textarea class="input" id="noteIn" placeholder="Section, weather, big table, who closed&hellip;"></textarea>
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn danger" id="deleteBtn">Delete</button>
+      <button class="btn primary" id="saveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var CACHE_KEY = "tipTracker.v2";
+  var LEGACY_KEY = "tipTracker.v1";
+  var POLL_MS = 15000;
+
+  var DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  var DOW_FULL = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  var MONTHS = ["January","February","March","April","May","June",
+                "July","August","September","October","November","December"];
+
+  // =========================================================== local state
+  // S.days[date] = {tips,hours,note,updatedAt,rev} or {deleted:true,updatedAt}
+  // S.pending[date] = updatedAt of the local edit still waiting to reach the server
+  var S = { days:{}, rev:0, pending:{} };
+
+  function loadLocal(){
+    try {
+      var raw = JSON.parse(localStorage.getItem(CACHE_KEY));
+      if(raw && typeof raw === "object"){
+        S.days = raw.days || {};
+        S.rev = Number(raw.rev) || 0;
+        S.pending = raw.pending || {};
+      }
+    } catch(e){ /* start clean */ }
+    migrateLegacy();
+  }
+
+  // carry over anything logged before syncing existed
+  function migrateLegacy(){
+    var old = null;
+    try { old = JSON.parse(localStorage.getItem(LEGACY_KEY)); } catch(e){ return; }
+    if(!old || typeof old !== "object") return;
+    var at = Date.now(), moved = 0;
+    Object.keys(old).forEach(function(k){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(k) || S.days[k]) return;
+      var e = old[k] || {};
+      S.days[k] = {
+        tips: Math.max(0, +e.tips || 0),
+        hours: Math.max(0, +e.hours || 0),
+        note: typeof e.note === "string" ? e.note : "",
+        updatedAt: at
+      };
+      S.pending[k] = at;
+      moved++;
+    });
+    if(moved){
+      saveLocal();
+      try { localStorage.removeItem(LEGACY_KEY); } catch(e){}
+      setTimeout(function(){ toast("Brought over " + moved + " day" + (moved===1?"":"s") + " from before"); }, 900);
+    }
+  }
+
+  function saveLocal(){
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(S)); }
+    catch(e){ toast("This browser will not let the app save locally"); }
+  }
+
+  function pendingCount(){ return Object.keys(S.pending).length; }
+
+  // ============================================================== helpers
+  function pad(n){ return (n < 10 ? "0" : "") + n; }
+  function key(d){ return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()); }
+  function fromKey(k){ var p = k.split("-"); return new Date(+p[0], +p[1]-1, +p[2]); }
+
+  var usd = new Intl.NumberFormat(undefined, {style:"currency", currency:"USD"});
+  function money(n){ return usd.format(n || 0); }
+
+  // compact form for calendar cells - cents are noise at that size
+  function cellMoney(n){
+    n = n || 0;
+    if(n >= 1000) return "$" + (Math.round(n / 100) / 10) + "k";
+    return "$" + Math.round(n);
+  }
+  function hrsText(n){
+    n = Math.round((n || 0) * 100) / 100;
+    return n.toLocaleString(undefined, {maximumFractionDigits:2}) + "h";
+  }
+  function rate(t, h){ return h > 0 ? money(t / h) + "/hr" : "—"; }
+  function rateShort(t, h){ return h > 0 ? money(t / h) : "—"; }
+
+  // ---------------------------------------------------- clock in / clock out
+  var TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+  function isTime(v){ return typeof v === "string" && TIME_RE.test(v); }
+  function minutesOf(t){ var p = t.split(":"); return (+p[0]) * 60 + (+p[1]); }
+
+  // hours between two clock times; an end at or before the start means
+  // the shift ran past midnight, except when they are identical
+  function spanHours(start, end){
+    if(!isTime(start) || !isTime(end)) return 0;
+    var mins = minutesOf(end) - minutesOf(start);
+    if(mins === 0) return 0;
+    if(mins < 0) mins += 1440;
+    return Math.round(mins / 60 * 100) / 100;
+  }
+  function crossesMidnight(start, end){
+    return isTime(start) && isTime(end) && minutesOf(end) < minutesOf(start);
+  }
+  function fmtTime(t){
+    if(!isTime(t)) return "";
+    var p = t.split(":");
+    var d = new Date(2000, 0, 1, +p[0], +p[1]);
+    return d.toLocaleTimeString(undefined, {hour:"numeric", minute:"2-digit"});
+  }
+  function fmtSpan(start, end){
+    if(!isTime(start) || !isTime(end)) return "";
+    return fmtTime(start) + " – " + fmtTime(end);
+  }
+  function hoursAndMinutes(h){
+    var mins = Math.round((h || 0) * 60);
+    var hh = Math.floor(mins / 60), mm = mins % 60;
+    return hh + "h" + (mm ? " " + mm + "m" : "");
+  }
+
+  function rec(k){ var r = S.days[k]; return (r && !r.deleted) ? r : null; }
+  function entry(k){
+    var r = rec(k);
+    if(!r) return {tips:0, hours:0, note:"", start:"", end:""};
+    return {
+      tips: +r.tips || 0,
+      hours: +r.hours || 0,
+      note: r.note || "",
+      start: isTime(r.start) ? r.start : "",
+      end: isTime(r.end) ? r.end : ""
+    };
+  }
+  function isWorked(k){
+    var r = rec(k);
+    return !!r && ((+r.tips||0) > 0 || (+r.hours||0) > 0);
+  }
+
+  function sum(keys){
+    var t = 0, h = 0, days = 0;
+    keys.forEach(function(k){
+      var r = rec(k);
+      if(!r) return;
+      t += (+r.tips || 0);
+      h += (+r.hours || 0);
+      if(isWorked(k)) days++;
+    });
+    return {tips:t, hours:h, days:days};
+  }
+  function weekStart(d){
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay());
+  }
+  function weekKeysFrom(start){
+    var out = [];
+    for(var i = 0; i < 7; i++){
+      out.push(key(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)));
+    }
+    return out;
+  }
+  function weekKeys(d){ return weekKeysFrom(weekStart(d)); }
+  function monthKeys(y, m){
+    var out = [], n = new Date(y, m + 1, 0).getDate();
+    for(var i = 1; i <= n; i++) out.push(y + "-" + pad(m+1) + "-" + pad(i));
+    return out;
+  }
+  function yearKeys(y){
+    return Object.keys(S.days).filter(function(k){ return k.indexOf(y + "-") === 0; });
+  }
+  function shortDate(d){ return MONTHS[d.getMonth()].slice(0,3) + " " + d.getDate(); }
+
+  // ================================================================ view
+  var today = new Date();
+  var view = new Date(today.getFullYear(), today.getMonth(), 1);
+  var selected = key(today);
+  var editDate = null;      // the day the sheet is editing
+  var dirty = false;
+
+  function $(id){ return document.getElementById(id); }
+  var calEl = $("cal"), monthLabel = $("monthLabel"), statsEl = $("stats");
+  var weekListEl = $("weekList"), weeksTitle = $("weeksTitle");
+  var tipsIn = $("tipsIn"), hoursIn = $("hoursIn"), noteIn = $("noteIn");
+  var startIn = $("startIn"), endIn = $("endIn");
+  var hoursBox = $("hoursBox"), rangeBox = $("rangeBox"), calcOut = $("calcOut");
+  var twoRow = $("twoRow"), modeHoursBtn = $("modeHoursBtn"), modeRangeBtn = $("modeRangeBtn");
+  var liveRate = $("liveRate"), toastEl = $("toast");
+  var syncPill = $("syncPill"), syncText = $("syncText");
+  var sheetWrap = $("sheetWrap"), sheetTitle = $("sheetTitle"), sheetSub = $("sheetSub");
+  var deleteBtn = $("deleteBtn"), fabText = $("fabText");
+  var menuEl = $("menu");
+
+  // ------------------------------------------------------- running total
+  function renderHero(){
+    var y = view.getFullYear(), m = view.getMonth();
+    var month = sum(monthKeys(y, m));
+    var week = sum(weekKeys(new Date()));
+    var sameMonth = (y === today.getFullYear() && m === today.getMonth());
+
+    $("heroLab").textContent = sameMonth
+      ? "This month so far"
+      : MONTHS[m] + " " + y;
+    $("heroBig").textContent = money(month.tips);
+    $("heroHours").textContent = hrsText(month.hours);
+    $("heroRate").textContent = month.hours > 0 ? money(month.tips / month.hours) : "—";
+    $("heroShifts").textContent = String(month.days);
+    $("heroWeek").textContent = money(week.tips);
+  }
+
+  // ------------------------------------------------------------ calendar
+  function renderCal(){
+    var y = view.getFullYear(), m = view.getMonth();
+    monthLabel.textContent = MONTHS[m] + " " + y;
+    calEl.innerHTML = "";
+
+    DOW.forEach(function(d){
+      var h = document.createElement("div");
+      h.className = "dow";
+      h.textContent = d.charAt(0);
+      h.setAttribute("aria-label", d);
+      calEl.appendChild(h);
+    });
+
+    var first = new Date(y, m, 1);
+    var lastOfMonth = new Date(y, m + 1, 0);
+    var cursor = new Date(y, m, 1 - first.getDay());
+    var todayKey = key(today);
+
+    for(var w = 0; w < 6; w++){
+      for(var i = 0; i < 7; i++){
+        var d = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate());
+        var k = key(d);
+        var r = rec(k);
+        var worked = isWorked(k);
+
+        var cell = document.createElement("button");
+        cell.type = "button";
+        cell.className = "day"
+          + (d.getMonth() !== m ? " out" : "")
+          + (worked ? " has" : "")
+          + (k === todayKey ? " today" : "")
+          + (k === selected ? " sel" : "");
+        cell.setAttribute("data-key", k);
+        cell.setAttribute("aria-label",
+          DOW_FULL[d.getDay()] + " " + shortDate(d) +
+          (worked ? ", " + money(r.tips) + ", " + hrsText(r.hours) : ", nothing logged"));
+
+        var num = document.createElement("span");
+        num.className = "num";
+        num.textContent = String(d.getDate());
+        cell.appendChild(num);
+
+        if(worked){
+          var amt = document.createElement("span");
+          amt.className = "amt";
+          amt.textContent = cellMoney(r.tips);
+          cell.appendChild(amt);
+
+          if((+r.hours || 0) > 0){
+            var hh = document.createElement("span");
+            hh.className = "hrs";
+            hh.textContent = hrsText(r.hours);
+            cell.appendChild(hh);
+
+            var rr = document.createElement("span");
+            rr.className = "rate";
+            rr.textContent = rate(r.tips, r.hours);
+            cell.appendChild(rr);
+          }
+        }
+
+        var marks = document.createElement("span");
+        marks.className = "marks";
+        if(r && r.note && r.note.trim()){
+          var dn = document.createElement("span");
+          dn.className = "mk note";
+          dn.title = r.note;
+          marks.appendChild(dn);
+        }
+        if(S.pending[k]){
+          var dp = document.createElement("span");
+          dp.className = "mk pend";
+          dp.title = "Not synced yet";
+          marks.appendChild(dp);
+        }
+        if(marks.childNodes.length) cell.appendChild(marks);
+
+        calEl.appendChild(cell);
+        cursor.setDate(cursor.getDate() + 1);
+      }
+      if(cursor > lastOfMonth) break;
+    }
+  }
+
+  // ------------------------------------------------------ earnings report
+  function statBlock(title, subtitle, s, extra, note){
+    var html = '<div class="stat"><div class="st-h">'
+      + '<span class="st-t">' + title + '</span>'
+      + '<span class="st-s">' + subtitle + '</span></div>'
+      + '<div class="st-m">' + money(s.tips) + '</div>'
+      + '<div class="metrics">'
+      + '<div class="metric"><div class="mv">' + hrsText(s.hours) + '</div><div class="mk">Hours</div></div>'
+      + '<div class="metric"><div class="mv">' + rate(s.tips, s.hours) + '</div><div class="mk">Per hour</div></div>';
+    (extra || []).forEach(function(x){
+      html += '<div class="metric"><div class="mv">' + x[0] + '</div><div class="mk">' + x[1] + '</div></div>';
+    });
+    html += '</div>';
+    if(note) html += '<div class="st-note">' + esc(note) + '</div>';
+    return html + '</div>';
+  }
+
+  function esc(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  function renderStats(){
+    var d = fromKey(selected);
+    var day = sum([selected]);
+    var wk = weekKeys(d), week = sum(wk);
+    var y = view.getFullYear(), m = view.getMonth();
+    var month = sum(monthKeys(y, m));
+    var year = sum(yearKeys(y));
+    var sel = entry(selected);
+    var note = sel.note;
+    var dayExtra = (sel.start && sel.end)
+      ? [[fmtSpan(sel.start, sel.end), crossesMidnight(sel.start, sel.end) ? "Overnight" : "Clock"]]
+      : null;
+
+    var ws = fromKey(wk[0]), we = fromKey(wk[6]);
+    var wLabel = shortDate(ws) + " – "
+      + (ws.getMonth() === we.getMonth() ? we.getDate() : shortDate(we));
+
+    statsEl.innerHTML =
+        statBlock("Selected day", DOW[d.getDay()] + " " + shortDate(d), day, dayExtra, note)
+      + statBlock("That week", wLabel, week,
+          [[week.days, week.days === 1 ? "Shift" : "Shifts"]])
+      + statBlock(MONTHS[m], String(y), month,
+          [[month.days, "Shifts"],
+           [month.days ? money(month.tips / month.days) : "—", "Per shift"]])
+      + statBlock(y + " to date", year.days + " shifts logged", year);
+
+    renderWeeks();
+  }
+
+  // every week that touches the month on screen
+  function renderWeeks(){
+    var y = view.getFullYear(), m = view.getMonth();
+    var first = new Date(y, m, 1);
+    var lastOfMonth = new Date(y, m + 1, 0);
+    var cursor = weekStart(first);
+    var selWeek = key(weekStart(fromKey(selected)));
+    var html = "";
+
+    weeksTitle.textContent = "Weeks in " + MONTHS[m];
+
+    while(cursor <= lastOfMonth){
+      var start = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate());
+      var keys = weekKeysFrom(start);
+      var s = sum(keys);
+      var end = fromKey(keys[6]);
+      var isSel = key(start) === selWeek;
+
+      html += '<div class="wrow' + (isSel ? " now" : "") + '">'
+        + '<span class="wd">' + shortDate(start) + ' – '
+          + (start.getMonth() === end.getMonth() ? end.getDate() : shortDate(end)) + '</span>'
+        + '<span class="wt">' + (s.tips ? money(s.tips) : "—") + '</span>'
+        + '<span class="wh">' + (s.hours ? hrsText(s.hours) : "") + '</span>'
+        + '<span class="wr">' + (s.hours ? rateShort(s.tips, s.hours) + "/hr" : "") + '</span>'
+        + '</div>';
+
+      cursor.setDate(cursor.getDate() + 7);
+    }
+    weekListEl.innerHTML = html;
+  }
+
+  function renderFab(){
+    var d = fromKey(selected);
+    var has = !!rec(selected);
+    var isToday = selected === key(today);
+    fabText.textContent = (has ? "Edit " : "") + (isToday ? "today" : shortDate(d));
+    $("fab").setAttribute("aria-label",
+      (has ? "Edit " : "Add tips for ") + DOW_FULL[d.getDay()] + " " + shortDate(d));
+  }
+
+  function renderAll(){ renderHero(); renderCal(); renderStats(); renderFab(); }
+
+  // =============================================================== toast
+  var toastTimer;
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastEl.classList.remove("show"); }, 2400);
+  }
+
+  // =============================================================== sheet
+  function openSheet(date){
+    editDate = date || selected;
+    var d = fromKey(editDate), e = entry(editDate), has = !!rec(editDate);
+    var hasTimes = !!(e.start && e.end);
+
+    sheetTitle.textContent = DOW_FULL[d.getDay()] + ", " + shortDate(d)
+      + (d.getFullYear() !== today.getFullYear() ? ", " + d.getFullYear() : "");
+    sheetSub.textContent = has
+      ? money(e.tips) + " over " + hrsText(e.hours)
+        + (hasTimes ? " · " + fmtSpan(e.start, e.end) : "")
+      : "Nothing logged for this day yet";
+
+    tipsIn.value  = e.tips  ? e.tips  : "";
+    hoursIn.value = e.hours ? e.hours : "";
+    noteIn.value  = e.note || "";
+    startIn.value = e.start;
+    endIn.value   = e.end;
+    deleteBtn.disabled = !has;
+
+    // a day already logged by clock time reopens that way; otherwise use
+    // whichever style was last chosen on this device
+    setMode(hasTimes ? "range" : (has ? "hours" : loadMode()), false);
+
+    dirty = false;
+    updateLive();
+
+    sheetWrap.hidden = false;
+    document.body.style.overflow = "hidden";
+    setTimeout(function(){ tipsIn.focus(); tipsIn.select(); }, 60);
+  }
+
+  function closeSheet(save){
+    if(save && dirty) commit(true);
+    sheetWrap.hidden = true;
+    document.body.style.overflow = "";
+    editDate = null;
+    dirty = false;
+  }
+
+  // ------------------------------------------------- hours entry mode
+  var MODE_KEY = "tipTracker.hoursMode";
+  var mode = "hours";               // "hours" | "range"
+
+  function loadMode(){
+    try { return localStorage.getItem(MODE_KEY) === "range" ? "range" : "hours"; }
+    catch(e){ return "hours"; }
+  }
+  function saveMode(m){
+    try { localStorage.setItem(MODE_KEY, m); } catch(e){}
+  }
+
+  /**
+   * carry=true means the user flipped the switch, so move the value across:
+   * range -> hours keeps the computed number, hours -> range leaves the clock
+   * blank but the typed hours stay as the fallback until times are entered.
+   */
+  function setMode(m, carry){
+    var next = (m === "range") ? "range" : "hours";
+    if(carry && next === "hours" && isTime(startIn.value) && isTime(endIn.value)){
+      hoursIn.value = spanHours(startIn.value, endIn.value) || "";
+    }
+    mode = next;
+    modeHoursBtn.className = "seg-b" + (mode === "hours" ? " on" : "");
+    modeRangeBtn.className = "seg-b" + (mode === "range" ? " on" : "");
+    modeHoursBtn.setAttribute("aria-pressed", mode === "hours" ? "true" : "false");
+    modeRangeBtn.setAttribute("aria-pressed", mode === "range" ? "true" : "false");
+    hoursBox.hidden = (mode === "range");
+    rangeBox.hidden = (mode !== "range");
+    twoRow.className = "two" + (mode === "range" ? " wide" : "");
+    if(carry) saveMode(mode);
+    renderCalc();
+  }
+
+  // the hours value that will actually be saved
+  function effectiveHours(){
+    if(mode === "range" && isTime(startIn.value) && isTime(endIn.value)){
+      return spanHours(startIn.value, endIn.value);
+    }
+    return Math.max(0, parseFloat(hoursIn.value) || 0);
+  }
+
+  function renderCalc(){
+    if(mode !== "range") return;
+    var s = startIn.value, e = endIn.value;
+    if(!isTime(s) || !isTime(e)){
+      calcOut.className = "calc empty";
+      calcOut.textContent = "Enter a start and end time";
+      return;
+    }
+    var h = spanHours(s, e);
+    if(h === 0){
+      calcOut.className = "calc empty";
+      calcOut.textContent = "Start and end are the same time";
+      return;
+    }
+    calcOut.className = "calc";
+    calcOut.innerHTML = '<span class="big">' + hoursAndMinutes(h) + '</span>'
+      + '<span>' + hrsText(h) + '</span>'
+      + (crossesMidnight(s, e) ? '<span class="tag">Overnight</span>' : '');
+  }
+
+  function updateLive(){
+    var t = parseFloat(tipsIn.value) || 0, h = effectiveHours();
+    liveRate.textContent = h > 0 ? rate(t, h) : "—";
+    renderCalc();
+  }
+
+  // ============================================================= editing
+  function touch(date, value){
+    var at = Date.now();
+    value.updatedAt = at;
+    S.days[date] = value;
+    S.pending[date] = at;
+    saveLocal();
+    renderAll();
+    setStatus();
+    scheduleSync();
+  }
+
+  function commit(silent){
+    var date = editDate || selected;
+    var t = Math.max(0, parseFloat(tipsIn.value) || 0);
+    var h = effectiveHours();
+    var n = noteIn.value.trim();
+    var keepTimes = (mode === "range" && spanHours(startIn.value, endIn.value) > 0);
+    dirty = false;
+
+    if(!t && !h && !n){
+      if(!rec(date)) return false;              // nothing there, nothing to do
+      touch(date, {deleted:true});
+    } else {
+      var row = {tips:t, hours:h, note:n};
+      if(keepTimes){ row.start = startIn.value; row.end = endIn.value; }
+      touch(date, row);
+    }
+    if(!silent) toast(money(t) + " saved for " + shortDate(fromKey(date)));
+    return true;
+  }
+
+  function deleteDay(){
+    var date = editDate || selected;
+    if(!rec(date)){ toast("Nothing to delete"); return; }
+    touch(date, {deleted:true});
+    dirty = false;
+    closeSheet(false);
+    toast("Cleared " + shortDate(fromKey(date)));
+  }
+
+  function selectDay(k){
+    selected = k;
+    var d = fromKey(k);
+    if(d.getMonth() !== view.getMonth() || d.getFullYear() !== view.getFullYear()){
+      view = new Date(d.getFullYear(), d.getMonth(), 1);
+    }
+    renderAll();
+  }
+  function shiftMonth(n){
+    view = new Date(view.getFullYear(), view.getMonth() + n, 1);
+    renderHero();
+    renderCal();
+    renderStats();
+  }
+
+  // ================================================================ sync
+  var syncing = false, syncTimer = null, lastError = "";
+  var state = "idle";   // idle | busy | off | err
+
+  function setStatus(next){
+    if(next) state = next;
+    var n = pendingCount();
+    var cls = "sync", label;
+
+    if(state === "busy"){ cls += " busy"; label = "Syncing…"; }
+    else if(state === "off"){ cls += " off"; label = n ? n + " to upload" : "Offline"; }
+    else if(state === "err"){ cls += " err"; label = "Sync problem"; }
+    else if(n){ cls += " off"; label = n + " unsynced"; }
+    else { cls += " ok"; label = "Synced"; }
+
+    syncPill.className = cls;
+    syncText.textContent = label;
+    syncPill.title = (state === "off" || state === "err")
+      ? (lastError || "Cannot reach the server. Your edits are saved here and will upload automatically.")
+      : "Synced - tap to check again";
+  }
+
+  function api(pathname, body){
+    var opt = { method: body === undefined ? "GET" : "POST", headers: {} };
+    if(body !== undefined){
+      opt.headers["Content-Type"] = "application/json";
+      opt.body = JSON.stringify(body);
+    }
+    return fetch(pathname, opt).then(function(r){
+      return r.text().then(function(text){
+        var json = null;
+        try { json = text ? JSON.parse(text) : null; } catch(e){}
+        if(!r.ok){
+          var err = new Error((json && json.error) || ("HTTP " + r.status));
+          err.status = r.status;
+          throw err;
+        }
+        return json || {};
+      });
+    });
+  }
+
+  function scheduleSync(){
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(function(){ sync(); }, 700);
+  }
+
+  function applyServerDays(list){
+    var changed = false;
+    (list || []).forEach(function(r){
+      if(!r || !/^\d{4}-\d{2}-\d{2}$/.test(r.date)) return;
+      if(S.pending[r.date]) return;              // local edit not pushed yet, keep ours
+      var next;
+      if(r.deleted){
+        next = {deleted:true, updatedAt:+r.updatedAt||0, rev:+r.rev||0};
+      } else {
+        next = {tips:+r.tips||0, hours:+r.hours||0, note:r.note||"",
+                updatedAt:+r.updatedAt||0, rev:+r.rev||0};
+        if(isTime(r.start) && isTime(r.end)){ next.start = r.start; next.end = r.end; }
+      }
+      var cur = S.days[r.date];
+      if(!cur || JSON.stringify(cur) !== JSON.stringify(next)){
+        S.days[r.date] = next;
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
+  function sync(){
+    if(syncing) return Promise.resolve();
+    syncing = true;
+    setStatus("busy");
+
+    // snapshot what we are pushing, so a mid-flight edit is not lost
+    var sent = {};
+    var changes = Object.keys(S.pending).map(function(date){
+      var r = S.days[date] || {deleted:true, updatedAt:S.pending[date]};
+      sent[date] = r.updatedAt;
+      var change = {
+        date: date,
+        tips: r.deleted ? 0 : (+r.tips || 0),
+        hours: r.deleted ? 0 : (+r.hours || 0),
+        note: r.deleted ? "" : (r.note || ""),
+        deleted: !!r.deleted,
+        updatedAt: r.updatedAt
+      };
+      if(!r.deleted && isTime(r.start) && isTime(r.end)){
+        change.start = r.start;
+        change.end = r.end;
+      }
+      return change;
+    });
+
+    return api("/api/sync", { since: S.rev, changes: changes })
+      .then(function(out){
+        // a date is settled once the server has seen it, whether it won or lost
+        Object.keys(sent).forEach(function(date){
+          var cur = S.days[date];
+          if(cur && cur.updatedAt === sent[date]) delete S.pending[date];
+        });
+        var changed = applyServerDays(out.days);
+        S.rev = Number(out.rev) || S.rev;
+        saveLocal();
+        lastError = "";
+        if(changed || changes.length) renderAll();
+        setStatus("idle");
+      })
+      .catch(function(err){
+        lastError = err.message || "Network error";
+        setStatus(err.status ? "err" : "off");
+      })
+      .then(function(){ syncing = false; });
+  }
+
+  // ============================================================== events
+  calEl.addEventListener("click", function(ev){
+    var cell = ev.target.closest(".day");
+    if(!cell) return;
+    var k = cell.getAttribute("data-key");
+    if(k === selected) openSheet(k);       // tap the selected day again to edit it
+    else selectDay(k);
+  });
+
+  $("fab").onclick     = function(){ openSheet(selected); };
+  $("prevBtn").onclick = function(){ shiftMonth(-1); };
+  $("nextBtn").onclick = function(){ shiftMonth(1); };
+  $("todayBtn").onclick= function(){ selectDay(key(new Date())); };
+  $("saveBtn").onclick = function(){ commit(false); closeSheet(false); };
+  $("sheetX").onclick  = function(){ closeSheet(true); };
+  $("sheetBg").onclick = function(){ closeSheet(true); };
+  deleteBtn.onclick    = function(){ deleteDay(); };
+  syncPill.onclick     = function(){ sync(); };
+
+  modeHoursBtn.onclick = function(){ setMode("hours", true); updateLive(); hoursIn.focus(); };
+  modeRangeBtn.onclick = function(){
+    setMode("range", true);
+    updateLive();
+    if(!isTime(startIn.value)) startIn.focus();
+  };
+
+  [tipsIn, hoursIn, startIn, endIn].forEach(function(el){
+    el.addEventListener("input", function(){ dirty = true; updateLive(); });
+    el.addEventListener("change", function(){ dirty = true; updateLive(); });
+    el.addEventListener("keydown", function(ev){
+      if(ev.key === "Enter"){ ev.preventDefault(); commit(false); closeSheet(false); }
+    });
+  });
+  noteIn.addEventListener("input", function(){ dirty = true; });
+  noteIn.addEventListener("keydown", function(ev){
+    if(ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)){
+      ev.preventDefault(); commit(false); closeSheet(false);
+    }
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".chip"), function(c){
+    c.onclick = function(){
+      hoursIn.value = c.getAttribute("data-h");
+      dirty = true;
+      updateLive();
+    };
+  });
+
+  // header menu
+  function closeMenu(){ menuEl.hidden = true; }
+  $("menuBtn").onclick = function(ev){
+    ev.stopPropagation();
+    menuEl.hidden = !menuEl.hidden;
+  };
+  document.addEventListener("click", function(ev){
+    if(!menuEl.hidden && !ev.target.closest(".menu-wrap")) closeMenu();
+  });
+  $("syncNowBtn").onclick = function(){ closeMenu(); sync(); toast("Syncing…"); };
+
+  document.addEventListener("keydown", function(ev){
+    if(ev.key === "Escape"){
+      if(!sheetWrap.hidden){ closeSheet(true); return; }
+      if(!menuEl.hidden){ closeMenu(); return; }
+    }
+    if(!sheetWrap.hidden) return;
+    var tag = (ev.target.tagName || "").toLowerCase();
+    if(tag === "input" || tag === "textarea") return;
+    if(ev.key === "ArrowLeft") shiftMonth(-1);
+    else if(ev.key === "ArrowRight") shiftMonth(1);
+    else if(ev.key === "t" || ev.key === "T") selectDay(key(new Date()));
+    else if(ev.key === "Enter" || ev.key === "+") openSheet(selected);
+  });
+
+  window.addEventListener("beforeunload", function(){ if(dirty) commit(true); });
+  window.addEventListener("online", function(){ sync(); });
+  window.addEventListener("offline", function(){ setStatus("off"); });
+  window.addEventListener("focus", function(){ sync(); });
+  document.addEventListener("visibilitychange", function(){
+    if(document.visibilityState === "visible") sync();
+  });
+  setInterval(function(){
+    if(document.visibilityState === "visible") sync();
+  }, POLL_MS);
+
+  // ===================================================== export / import
+  $("exportBtn").onclick = function(){
+    closeMenu();
+    var out = {};
+    Object.keys(S.days).forEach(function(k){
+      var r = rec(k);
+      if(r) out[k] = {tips:+r.tips||0, hours:+r.hours||0, note:r.note||""};
+    });
+    var blob = new Blob([JSON.stringify(out, null, 2)], {type:"application/json"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "tips-backup-" + key(new Date()) + ".json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    toast("Backup downloaded");
+  };
+
+  $("importBtn").onclick = function(){ closeMenu(); $("fileIn").click(); };
+  $("fileIn").onchange = function(ev){
+    var f = ev.target.files[0];
+    if(!f) return;
+    var r = new FileReader();
+    r.onload = function(){
+      try {
+        var incoming = JSON.parse(r.result);
+        if(!incoming || typeof incoming !== "object") throw new Error("bad shape");
+        var at = Date.now(), n = 0;
+        Object.keys(incoming).forEach(function(k){
+          if(!/^\d{4}-\d{2}-\d{2}$/.test(k)) return;
+          var e = incoming[k] || {};
+          S.days[k] = {
+            tips: Math.max(0, +e.tips || 0),
+            hours: Math.max(0, +e.hours || 0),
+            note: typeof e.note === "string" ? e.note : "",
+            updatedAt: at
+          };
+          S.pending[k] = at;
+          n++;
+        });
+        saveLocal();
+        renderAll();
+        setStatus();
+        toast("Imported " + n + " day" + (n === 1 ? "" : "s") + " — uploading");
+        sync();
+      } catch(err){
+        toast("That file did not look like a backup");
+      }
+      ev.target.value = "";
+    };
+    r.readAsText(f);
+  };
+
+  // ================================================================ boot
+  loadLocal();
+  renderAll();        // cached data shows instantly
+  setStatus("idle");
+  sync();             // then catch up with the server
+})();
+</script>
+</body>
+</html>
