@@ -311,9 +311,22 @@ function lanAddresses(){
   return out.sort((a, b) => a.score - b.score);
 }
 
+// open the app in the default browser, used by the double-click launcher
+function openBrowser(url){
+  const { spawn } = require('child_process');
+  const cmd = process.platform === 'win32' ? ['cmd', ['/c', 'start', '""', url]]
+    : process.platform === 'darwin' ? ['open', [url]]
+    : ['xdg-open', [url]];
+  try {
+    spawn(cmd[0], cmd[1], { stdio: 'ignore', detached: true, windowsHide: true })
+      .on('error', () => {})
+      .unref();
+  } catch(e){ /* no browser is fine, the address is printed */ }
+}
+
 function cli(){
   const flag = process.argv[2];
-  if(!flag) return false;
+  if(!flag || flag === '--open') return false;
 
   if(flag === '--show-data'){
     console.log(DB_FILE);
@@ -321,14 +334,17 @@ function cli(){
     return true;
   }
   console.error('Unknown option: ' + flag);
-  console.error('Try: node server.js  |  node server.js --show-data');
+  console.error('Try: node server.js  |  node server.js --open  |  node server.js --show-data');
   process.exitCode = 1;
   return true;
 }
 
+const OPEN = process.argv[2] === '--open';
+
 loadDb();
 if(!cli()){
   server.listen(PORT, HOST, () => {
+    if(OPEN) openBrowser('http://localhost:' + PORT);
     const days = Object.keys(db.days).filter(k => !db.days[k].deleted).length;
     const lan = lanAddresses();
     console.log('');
@@ -361,6 +377,15 @@ if(!cli()){
 
   server.on('error', err => {
     if(err.code === 'EADDRINUSE'){
+      if(OPEN){
+        // most likely the tracker is already running in another window
+        openBrowser('http://localhost:' + PORT);
+        console.error('\n  Port ' + PORT + ' is already in use - opened the browser in case');
+        console.error('  the tracker is already running in another window.');
+        console.error('  If the page does not load, something else owns the port. Pick another:');
+        console.error('    set PORT=8090 && npm start\n');
+        process.exit(1);
+      }
       console.error('\n  Port ' + PORT + ' is already in use.');
       console.error('  Either the tracker is already running, or pick another port:');
       console.error('    set PORT=8090 && npm start\n');

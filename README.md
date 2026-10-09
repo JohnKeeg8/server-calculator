@@ -16,7 +16,8 @@ Single user, no login. Open the page and it's there.
 
 ## Start it
 
-Double-click **`start-server.cmd`**, or from a terminal in this folder:
+Double-click **`start-server.cmd`**. It starts the server and opens the app in
+your browser. Or from a terminal in this folder:
 
 ```
 npm run dev      # restarts itself when you edit server.js
@@ -123,6 +124,12 @@ If `data/tips.json` is ever unreadable, the server renames it to
 `data/backups`. It will not silently overwrite a damaged file.
 
 ## Troubleshooting
+
+**Double-clicking `start-server.cmd` does nothing / the window flashes and
+closes** — make sure Node.js 18+ is installed (`node --version` in a terminal),
+then try running `node server.js` from a terminal in this folder to see the
+error. If you downloaded an old copy, re-download it: earlier versions of the
+launcher had Unix line endings that Windows can misread.
 
 **"Port 8080 is already in use"** — the tracker is probably already running in
 another window. To use a different port:

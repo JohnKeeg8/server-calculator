@@ -12,7 +12,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-node server.js
+node server.js --open
 echo.
 echo   The server stopped.
 pause
