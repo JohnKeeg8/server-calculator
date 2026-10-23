@@ -3,8 +3,9 @@
 Track tips, hours, and notes per day on a calendar.
 
 It's a Progressive Web App (plain HTML/CSS/JS, no server and nothing to install),
-hosted the same way as the study app: on **GitHub Pages**. Once it's hosted you
-can add it to your home screen, and it works offline.
+hosted the same way as the study app: as static files on your own web server
+(no Node.js). Once it's hosted you can add it to your home screen, and it works
+offline.
 
 All data is stored on the device in your browser and isn't synced between
 devices. Use **Export backup** now and then to keep a copy.
@@ -13,9 +14,23 @@ devices. Use **Export backup** now and then to keep a copy.
 
 ## Put it on your phone
 
-1. Host it with **GitHub Pages**: in the repo on GitHub go to **Settings → Pages**,
-   set *Source* to "Deploy from a branch", and pick your branch and `/ (root)`.
-   After a minute it will be live at `https://<your-username>.github.io/server-calculator/`.
+1. Copy the app files (`index.html`, `sw.js`, `manifest.webmanifest`, `icons/`)
+   into a folder your web server serves, for example `/srv/server-calculator`.
+   Any static file server works. It can be its own site or a subfolder of an
+   existing one (all paths are relative). With Caddy:
+
+   ```
+   calc.example.com {
+       root * /srv/server-calculator
+       file_server
+       header Cache-Control "no-cache"
+   }
+   ```
+
+   `Cache-Control: no-cache` makes browsers check for a newer version each time
+   the app opens. Serve it over **HTTPS** (Caddy does this automatically):
+   phones only allow offline mode and a proper home-screen install on HTTPS
+   pages (or `localhost`).
 2. Open that URL on your phone:
    - **iPhone (Safari):** Share button → **Add to Home Screen**.
    - **Android (Chrome):** ⋮ menu → **Add to Home screen** / **Install app**.
@@ -99,7 +114,8 @@ data, so keep a recent export.
 ## Updating the app
 
 After changing `index.html`, bump `CACHE` in `sw.js` (e.g. `server-calc-v2`) so
-installed copies pick up the new version.
+installed copies pick up the new version, then copy the files to the server
+again. Nothing needs restarting.
 
 ## Files
 
