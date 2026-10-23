@@ -8,8 +8,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Server Calc">
 <meta name="format-detection" content="telephone=no">
-<link rel="manifest" href="/manifest.webmanifest">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232b8cc4'/%3E%3Ctext x='32' y='45' font-size='34' text-anchor='middle' fill='%23fff' font-family='Segoe UI,Arial,sans-serif' font-weight='bold'%3E%24%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <title>Server Calculator</title>
 <style>
   :root{
@@ -77,22 +78,6 @@
     h1{font-size:19px}
   }
 
-  .sync{
-    display:inline-flex;align-items:center;gap:6px;
-    border:1px solid var(--line);background:var(--surface);
-    border-radius:999px;padding:6px 11px 6px 9px;font-size:12px;color:var(--ink-2);
-    transition:.15s;white-space:nowrap;
-  }
-  .sync .dot{width:7px;height:7px;border-radius:50%;background:var(--ink-3);flex:none}
-  .sync.ok .dot{background:#2f9e6f}
-  .sync.busy .dot{background:var(--brand);animation:pulse 1s ease-in-out infinite}
-  .sync.off{background:var(--warn-bg);border-color:#efdcb4;color:var(--warn)}
-  .sync.off .dot{background:var(--warn)}
-  .sync.err{background:#fdf2f2;border-color:#e7c3c3;color:var(--bad)}
-  .sync.err .dot{background:var(--bad)}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
-  .sync .label{display:none}
-  @media (min-width:420px){.sync .label{display:inline}}
 
   .menu-wrap{position:relative}
   .icon-btn{
@@ -192,7 +177,6 @@
   .day .marks{position:absolute;top:4px;right:4px;display:flex;gap:2px}
   .day .mk{width:5px;height:5px;border-radius:50%}
   .day .mk.note{background:var(--brand-light)}
-  .day .mk.pend{background:var(--warn)}
 
   /* very narrow phones (320px class): claw back horizontal space */
   @media (max-width:359px){
@@ -407,16 +391,11 @@
     <div class="logo">&#127864;</div>
     <h1>Server Calculator</h1>
     <div class="head-right">
-      <button class="sync" id="syncPill" title="Tap to sync now">
-        <span class="dot"></span><span class="label" id="syncText">Starting</span>
-      </button>
       <div class="menu-wrap">
         <button class="icon-btn" id="menuBtn" aria-label="More actions" aria-haspopup="true">&#8942;</button>
         <div class="menu" id="menu" hidden>
           <button id="exportBtn">Export backup</button>
           <button id="importBtn">Import backup</button>
-          <div class="sep"></div>
-          <button id="syncNowBtn">Sync now</button>
         </div>
       </div>
       <input type="file" id="fileIn" accept=".json,application/json" hidden>
@@ -465,7 +444,7 @@
     </section>
   </div>
 
-  <div class="foot">Synced through your PC &middot; works offline and catches up later</div>
+  <div class="foot">Saved on this device &middot; works offline &middot; export a backup now and then</div>
 </div>
 
 <!-- add / edit a day -->
@@ -548,7 +527,6 @@
 
   var CACHE_KEY = "tipTracker.v2";
   var LEGACY_KEY = "tipTracker.v1";
-  var POLL_MS = 15000;
 
   var DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
   var DOW_FULL = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -556,17 +534,14 @@
                 "July","August","September","October","November","December"];
 
   // =========================================================== local state
-  // S.days[date] = {tips,hours,note,updatedAt,rev} or {deleted:true,updatedAt}
-  // S.pending[date] = updatedAt of the local edit still waiting to reach the server
-  var S = { days:{}, rev:0, pending:{} };
+  // S.days[date] = {tips,hours,note,updatedAt} or {deleted:true,updatedAt}
+  var S = { days:{} };
 
   function loadLocal(){
     try {
       var raw = JSON.parse(localStorage.getItem(CACHE_KEY));
       if(raw && typeof raw === "object"){
         S.days = raw.days || {};
-        S.rev = Number(raw.rev) || 0;
-        S.pending = raw.pending || {};
       }
     } catch(e){ /* start clean */ }
     migrateLegacy();
@@ -587,7 +562,6 @@
         note: typeof e.note === "string" ? e.note : "",
         updatedAt: at
       };
-      S.pending[k] = at;
       moved++;
     });
     if(moved){
@@ -601,8 +575,6 @@
     try { localStorage.setItem(CACHE_KEY, JSON.stringify(S)); }
     catch(e){ toast("This browser will not let the app save locally"); }
   }
-
-  function pendingCount(){ return Object.keys(S.pending).length; }
 
   // ============================================================== helpers
   function pad(n){ return (n < 10 ? "0" : "") + n; }
@@ -722,7 +694,6 @@
   var hoursBox = $("hoursBox"), rangeBox = $("rangeBox"), calcOut = $("calcOut");
   var twoRow = $("twoRow"), modeHoursBtn = $("modeHoursBtn"), modeRangeBtn = $("modeRangeBtn");
   var liveRate = $("liveRate"), toastEl = $("toast");
-  var syncPill = $("syncPill"), syncText = $("syncText");
   var sheetWrap = $("sheetWrap"), sheetTitle = $("sheetTitle"), sheetSub = $("sheetSub");
   var deleteBtn = $("deleteBtn"), fabText = $("fabText");
   var menuEl = $("menu");
@@ -813,12 +784,6 @@
           dn.className = "mk note";
           dn.title = r.note;
           marks.appendChild(dn);
-        }
-        if(S.pending[k]){
-          var dp = document.createElement("span");
-          dp.className = "mk pend";
-          dp.title = "Not synced yet";
-          marks.appendChild(dp);
         }
         if(marks.childNodes.length) cell.appendChild(marks);
 
@@ -1045,11 +1010,8 @@
     var at = Date.now();
     value.updatedAt = at;
     S.days[date] = value;
-    S.pending[date] = at;
     saveLocal();
     renderAll();
-    setStatus();
-    scheduleSync();
   }
 
   function commit(silent){
@@ -1096,121 +1058,6 @@
     renderStats();
   }
 
-  // ================================================================ sync
-  var syncing = false, syncTimer = null, lastError = "";
-  var state = "idle";   // idle | busy | off | err
-
-  function setStatus(next){
-    if(next) state = next;
-    var n = pendingCount();
-    var cls = "sync", label;
-
-    if(state === "busy"){ cls += " busy"; label = "Syncing…"; }
-    else if(state === "off"){ cls += " off"; label = n ? n + " to upload" : "Offline"; }
-    else if(state === "err"){ cls += " err"; label = "Sync problem"; }
-    else if(n){ cls += " off"; label = n + " unsynced"; }
-    else { cls += " ok"; label = "Synced"; }
-
-    syncPill.className = cls;
-    syncText.textContent = label;
-    syncPill.title = (state === "off" || state === "err")
-      ? (lastError || "Cannot reach the server. Your edits are saved here and will upload automatically.")
-      : "Synced - tap to check again";
-  }
-
-  function api(pathname, body){
-    var opt = { method: body === undefined ? "GET" : "POST", headers: {} };
-    if(body !== undefined){
-      opt.headers["Content-Type"] = "application/json";
-      opt.body = JSON.stringify(body);
-    }
-    return fetch(pathname, opt).then(function(r){
-      return r.text().then(function(text){
-        var json = null;
-        try { json = text ? JSON.parse(text) : null; } catch(e){}
-        if(!r.ok){
-          var err = new Error((json && json.error) || ("HTTP " + r.status));
-          err.status = r.status;
-          throw err;
-        }
-        return json || {};
-      });
-    });
-  }
-
-  function scheduleSync(){
-    clearTimeout(syncTimer);
-    syncTimer = setTimeout(function(){ sync(); }, 700);
-  }
-
-  function applyServerDays(list){
-    var changed = false;
-    (list || []).forEach(function(r){
-      if(!r || !/^\d{4}-\d{2}-\d{2}$/.test(r.date)) return;
-      if(S.pending[r.date]) return;              // local edit not pushed yet, keep ours
-      var next;
-      if(r.deleted){
-        next = {deleted:true, updatedAt:+r.updatedAt||0, rev:+r.rev||0};
-      } else {
-        next = {tips:+r.tips||0, hours:+r.hours||0, note:r.note||"",
-                updatedAt:+r.updatedAt||0, rev:+r.rev||0};
-        if(isTime(r.start) && isTime(r.end)){ next.start = r.start; next.end = r.end; }
-      }
-      var cur = S.days[r.date];
-      if(!cur || JSON.stringify(cur) !== JSON.stringify(next)){
-        S.days[r.date] = next;
-        changed = true;
-      }
-    });
-    return changed;
-  }
-
-  function sync(){
-    if(syncing) return Promise.resolve();
-    syncing = true;
-    setStatus("busy");
-
-    // snapshot what we are pushing, so a mid-flight edit is not lost
-    var sent = {};
-    var changes = Object.keys(S.pending).map(function(date){
-      var r = S.days[date] || {deleted:true, updatedAt:S.pending[date]};
-      sent[date] = r.updatedAt;
-      var change = {
-        date: date,
-        tips: r.deleted ? 0 : (+r.tips || 0),
-        hours: r.deleted ? 0 : (+r.hours || 0),
-        note: r.deleted ? "" : (r.note || ""),
-        deleted: !!r.deleted,
-        updatedAt: r.updatedAt
-      };
-      if(!r.deleted && isTime(r.start) && isTime(r.end)){
-        change.start = r.start;
-        change.end = r.end;
-      }
-      return change;
-    });
-
-    return api("/api/sync", { since: S.rev, changes: changes })
-      .then(function(out){
-        // a date is settled once the server has seen it, whether it won or lost
-        Object.keys(sent).forEach(function(date){
-          var cur = S.days[date];
-          if(cur && cur.updatedAt === sent[date]) delete S.pending[date];
-        });
-        var changed = applyServerDays(out.days);
-        S.rev = Number(out.rev) || S.rev;
-        saveLocal();
-        lastError = "";
-        if(changed || changes.length) renderAll();
-        setStatus("idle");
-      })
-      .catch(function(err){
-        lastError = err.message || "Network error";
-        setStatus(err.status ? "err" : "off");
-      })
-      .then(function(){ syncing = false; });
-  }
-
   // ============================================================== events
   calEl.addEventListener("click", function(ev){
     var cell = ev.target.closest(".day");
@@ -1228,7 +1075,6 @@
   $("sheetX").onclick  = function(){ closeSheet(true); };
   $("sheetBg").onclick = function(){ closeSheet(true); };
   deleteBtn.onclick    = function(){ deleteDay(); };
-  syncPill.onclick     = function(){ sync(); };
 
   modeHoursBtn.onclick = function(){ setMode("hours", true); updateLive(); hoursIn.focus(); };
   modeRangeBtn.onclick = function(){
@@ -1268,7 +1114,6 @@
   document.addEventListener("click", function(ev){
     if(!menuEl.hidden && !ev.target.closest(".menu-wrap")) closeMenu();
   });
-  $("syncNowBtn").onclick = function(){ closeMenu(); sync(); toast("Syncing…"); };
 
   document.addEventListener("keydown", function(ev){
     if(ev.key === "Escape"){
@@ -1285,15 +1130,6 @@
   });
 
   window.addEventListener("beforeunload", function(){ if(dirty) commit(true); });
-  window.addEventListener("online", function(){ sync(); });
-  window.addEventListener("offline", function(){ setStatus("off"); });
-  window.addEventListener("focus", function(){ sync(); });
-  document.addEventListener("visibilitychange", function(){
-    if(document.visibilityState === "visible") sync();
-  });
-  setInterval(function(){
-    if(document.visibilityState === "visible") sync();
-  }, POLL_MS);
 
   // ===================================================== export / import
   $("exportBtn").onclick = function(){
@@ -1301,7 +1137,9 @@
     var out = {};
     Object.keys(S.days).forEach(function(k){
       var r = rec(k);
-      if(r) out[k] = {tips:+r.tips||0, hours:+r.hours||0, note:r.note||""};
+      if(!r) return;
+      out[k] = {tips:+r.tips||0, hours:+r.hours||0, note:r.note||""};
+      if(isTime(r.start) && isTime(r.end)){ out[k].start = r.start; out[k].end = r.end; }
     });
     var blob = new Blob([JSON.stringify(out, null, 2)], {type:"application/json"});
     var url = URL.createObjectURL(blob);
@@ -1324,24 +1162,25 @@
       try {
         var incoming = JSON.parse(r.result);
         if(!incoming || typeof incoming !== "object") throw new Error("bad shape");
+        // also accepts data/tips.json from the old PC server: {version, rev, days:{...}}
+        if(incoming.days && typeof incoming.days === "object") incoming = incoming.days;
         var at = Date.now(), n = 0;
         Object.keys(incoming).forEach(function(k){
           if(!/^\d{4}-\d{2}-\d{2}$/.test(k)) return;
           var e = incoming[k] || {};
+          if(e.deleted) return;
           S.days[k] = {
             tips: Math.max(0, +e.tips || 0),
             hours: Math.max(0, +e.hours || 0),
             note: typeof e.note === "string" ? e.note : "",
             updatedAt: at
           };
-          S.pending[k] = at;
+          if(isTime(e.start) && isTime(e.end)){ S.days[k].start = e.start; S.days[k].end = e.end; }
           n++;
         });
         saveLocal();
         renderAll();
-        setStatus();
-        toast("Imported " + n + " day" + (n === 1 ? "" : "s") + " — uploading");
-        sync();
+        toast("Imported " + n + " day" + (n === 1 ? "" : "s"));
       } catch(err){
         toast("That file did not look like a backup");
       }
@@ -1352,9 +1191,16 @@
 
   // ================================================================ boot
   loadLocal();
-  renderAll();        // cached data shows instantly
-  setStatus("idle");
-  sync();             // then catch up with the server
+  renderAll();
+
+  if("serviceWorker" in navigator && location.protocol !== "file:"){
+    // When an updated service worker takes over, reload once so the new version shows right away.
+    var hadController = !!navigator.serviceWorker.controller, reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", function(){
+      if(hadController && !reloaded){ reloaded = true; location.reload(); }
+    });
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).catch(function(){});
+  }
 })();
 </script>
 </body>

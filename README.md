@@ -1,52 +1,43 @@
 # Server Calculator
 
-Track tips, hours, and notes per day on a calendar. Runs on your own PC and syncs
-to every device on your Wi-Fi, so a shift logged on your phone shows up on the
-laptop and the other way around.
+Track tips, hours, and notes per day on a calendar.
 
-```
-  phone  ─┐
-          ├──>  http://<your-pc>:8080  ──>  data/tips.json
-  laptop ─┘
-```
+It's a Progressive Web App (plain HTML/CSS/JS, no server and nothing to install),
+hosted the same way as the study app: on **GitHub Pages**. Once it's hosted you
+can add it to your home screen, and it works offline.
 
-Single user, no login. Open the page and it's there.
+All data is stored on the device in your browser and isn't synced between
+devices. Use **Export backup** now and then to keep a copy.
 
 ---
 
-## Start it
-
-Double-click **`start-server.cmd`**, or from a terminal in this folder:
-
-```
-npm run dev      # restarts itself when you edit server.js
-npm start        # plain run
-node server.js   # same thing, no npm involved
-```
-
-There is nothing to install first — no dependencies, no build step. `npm install`
-is not needed and will do nothing useful.
-
-Leave that window open — it *is* the server. `Ctrl+C` stops it. On startup it
-prints the two addresses you need:
-
-```
-  On this PC      http://localhost:8080
-  On your phone   http://192.168.8.125:8080   (same Wi-Fi)
-```
-
 ## Put it on your phone
 
-1. Make sure the phone is on the same Wi-Fi as the PC.
-2. Open the `192.168.x.x` address from the startup output.
-3. Browser menu → **Add to Home Screen**. It then opens full-screen like a normal
-   app, which is how it is meant to be used — the layout is built phone-first.
+1. Host it with **GitHub Pages**: in the repo on GitHub go to **Settings → Pages**,
+   set *Source* to "Deploy from a branch", and pick your branch and `/ (root)`.
+   After a minute it will be live at `https://<your-username>.github.io/server-calculator/`.
+2. Open that URL on your phone:
+   - **iPhone (Safari):** Share button → **Add to Home Screen**.
+   - **Android (Chrome):** ⋮ menu → **Add to Home screen** / **Install app**.
+3. Launch it from the home-screen icon. It opens full-screen like a normal app,
+   which is how it is meant to be used — the layout is built phone-first.
 
-If the phone can't load the page, Windows Firewall is almost certainly blocking
-it. In an **Administrator** PowerShell, run this once:
+Use it from the home-screen icon rather than a browser tab: iPhones can clear
+data for websites that haven't been opened in a while, but not for apps added to
+the home screen.
 
-```powershell
-netsh advfirewall firewall add rule name="Server Calculator 8080" dir=in action=allow protocol=TCP localport=8080
+## Bringing over data from the old PC version
+
+The old version kept everything in `data/tips.json` (with daily copies in
+`data/backups/`) in the folder you ran it from on your PC. Copy that file to your
+phone (or open the app on the PC), then **⋮ → Import backup** and pick it.
+Days, notes, and clock-in/out times all come across.
+
+## Run locally
+
+```sh
+python3 -m http.server 8000
+# then open http://localhost:8000
 ```
 
 ## Using it
@@ -65,7 +56,6 @@ earnings report. The entry form stays out of the way until you ask for it.
 | Erase a day | Open it and press **Delete** |
 | Jump to today | **Today** button, or press `T` |
 | Change month | `‹` / `›`, or `←` / `→` |
-| Force a sync | Tap the status pill |
 | Export / import | The **⋮** menu, top right |
 
 ### Hours vs start/end
@@ -90,77 +80,32 @@ Day squares show whole dollars (`$163`) so the number fits a phone screen, and
 abbreviate past a thousand (`$1.2k`). Exact cents appear in the entry form and in
 every total.
 
-Dots in the corner of a day square: **blue** = it has a note,
-**amber** = not synced yet. The selected day's note is shown in the earnings
+A **blue** dot in the corner of a day square means it has a note. The selected day's note is shown in the earnings
 report, so you do not have to open anything to read it.
-
-## How syncing behaves
-
-- Every change saves to the device instantly, then uploads a moment later.
-- **No internet needed** — only the PC and the device being on the same network.
-  With the server off you can still open the app on a device that has loaded it
-  before, keep logging shifts, and everything uploads when the server comes
-  back. The status pill shows how many days are waiting.
-- If the *same day* is edited on two devices, the **most recent edit wins** and
-  the other device is updated to match. Different days never conflict.
-- The status pill reads `Synced`, `Syncing…`, `N unsynced`, or `Offline`.
 
 ## Your data
 
-| What | Where |
-| --- | --- |
-| Live data | `data/tips.json` |
-| Backups | `data/backups/tips-YYYY-MM-DD.json` — one per day, last 30 kept |
+Everything lives in the browser's storage for this site, on this device only.
+Different phones, or different browsers on the same phone, each have their own
+separate copy.
 
-Today's backup is rewritten on every save, so the newest file is always current.
-To **restore**, stop the server and copy a backup over `data/tips.json`.
+`Export backup` in the **⋮** menu downloads a plain JSON file; `Import backup`
+merges one back in (imported days replace the same dates). Importing is also
+how you move your data to another device.
 
-`Export` in the app downloads a plain JSON file; `Import` merges one back in and
-uploads it. `npm run where` prints the data file path.
+Clearing your browser's site data, or deleting the home-screen app, erases the
+data, so keep a recent export.
 
-If `data/tips.json` is ever unreadable, the server renames it to
-`tips.json.unreadable-<timestamp>`, starts empty, and tells you to check
-`data/backups`. It will not silently overwrite a damaged file.
+## Updating the app
 
-## Troubleshooting
-
-**"Port 8080 is already in use"** — the tracker is probably already running in
-another window. To use a different port:
-
-```
-set PORT=8090 && npm start
-```
-
-**Server not responding on the phone** — the PC is asleep, the server window was
-closed, the phone is on cellular or a guest network, or the firewall rule above
-hasn't been added. The PC's `192.168.x.x` address can also change after a
-router reboot; the startup output always shows the current one.
-
-**Phone shows old numbers** — pull to refresh, or tap the status pill. The app
-also syncs whenever you switch back to it.
-
-## Worth knowing
-
-- **There is no password.** Anything that can reach the port can read and edit
-  your tips. That's fine on your own home Wi-Fi. Don't run it on café, hotel, or
-  airport Wi-Fi, and never forward this port through your router to the open
-  internet.
-- Sync only works while the PC is awake and the server window is open. Consider
-  turning off sleep on the PC if you want to log tips from your phone at work.
-- You already have Tailscale on this machine. If you want the tracker to work
-  from *anywhere*, not just home Wi-Fi, install Tailscale on your phone and use
-  the PC's Tailscale address (`100.x.y.z:8080`) instead. That connection is
-  encrypted and reaches only your own devices, so it stays private without
-  needing a password.
+After changing `index.html`, bump `CACHE` in `sw.js` (e.g. `server-calc-v2`) so
+installed copies pick up the new version.
 
 ## Files
 
 ```
-index.html        the whole app (calendar, editor, summaries, sync)
-server.js         sync server and static host, no dependencies
-package.json      npm script shortcuts only - there are no dependencies
-start-server.cmd  double-click launcher
-data/             created on first run: live data + daily backups
+index.html            the whole app (calendar, editor, summaries, storage)
+sw.js                 service worker: offline support and updates
+manifest.webmanifest  home-screen app name, colors, icons
+icons/                app icons
 ```
-
-Requires Node.js 18 or newer (tested on 20.17). No `npm install`, no build step.
