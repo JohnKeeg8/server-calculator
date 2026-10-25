@@ -1,11 +1,9 @@
-# Data from the old PC server version - never publish earnings
+# Tip data when server.py runs from this folder - never publish earnings
 data/
 
 # Runtime noise
 *.log
-npm-debug.log*
-
-node_modules/
+__pycache__/
 
 # OS junk
 Thumbs.db

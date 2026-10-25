@@ -1,5 +1,5 @@
 // Bump CACHE whenever app files change so phones pick up the update.
-const CACHE = "server-calc-v1";
+const CACHE = "server-calc-v2";
 const ASSETS = [
   "./",
   "index.html",
@@ -26,7 +26,8 @@ self.addEventListener("activate", (e) => {
 
 // Network first so updates show up when online; fall back to cache when offline.
 self.addEventListener("fetch", (e) => {
-  if (e.request.method !== "GET") return;
+  // Sync calls always go straight to the server.
+  if (e.request.method !== "GET" || new URL(e.request.url).pathname.includes("/api/")) return;
   e.respondWith(
     fetch(e.request.mode === "navigate" ? e.request.url : e.request, { cache: "no-cache" })
       .then((res) => {

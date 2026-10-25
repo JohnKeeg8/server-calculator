@@ -1,0 +1,22 @@
+# systemd service: starts the sync server on boot and restarts it if it stops.
+# Install:  cp server-calculator.service /etc/systemd/system/
+#           systemctl daemon-reload && systemctl enable --now server-calculator
+# Assumes the app is in /srv/server-calculator; change WorkingDirectory and
+# ExecStart if it lives somewhere else.
+
+[Unit]
+Description=Server Calculator sync server
+After=network.target
+
+[Service]
+WorkingDirectory=/srv/server-calculator
+ExecStart=/usr/bin/python3 /srv/server-calculator/server.py
+Environment=PORT=8080 HOST=127.0.0.1 DATA_DIR=/var/lib/server-calculator
+# runs as a throwaway user that can only write its own data folder
+DynamicUser=yes
+StateDirectory=server-calculator
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

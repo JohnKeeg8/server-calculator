@@ -1,59 +1,103 @@
 # Server Calculator
 
-Track tips, hours, and notes per day on a calendar.
+Track tips, hours, and notes per day on a calendar. Everything is saved on your
+own server, so a shift logged on your phone shows up on the laptop and the
+other way around.
 
-It's a Progressive Web App (plain HTML/CSS/JS, no server and nothing to install),
-hosted the same way as the study app: as static files on your own web server
-(no Node.js). Once it's hosted you can add it to your home screen, and it works
-offline.
+```
+  phone  ─┐                      ┌─ app files
+          ├──>  Caddy (HTTPS) ──>│
+  laptop ─┘                      └─ server.py ──> /var/lib/server-calculator/tips.json
+```
 
-All data is stored on the device in your browser and isn't synced between
-devices. Use **Export backup** now and then to keep a copy.
+It's a Progressive Web App (plain HTML/CSS/JS) with a small sync server,
+`server.py`, that uses only Python's standard library, so there is nothing to
+install. Once it's hosted you can add it to your home screen, and it keeps
+working offline: changes wait on the device and upload when the server is
+reachable again.
+
+Single user, no login. Open the page and it's there.
 
 ---
 
-## Put it on your phone
+## Set it up on your server
 
-1. Copy the app files (`index.html`, `sw.js`, `manifest.webmanifest`, `icons/`)
-   into a folder your web server serves, for example `/srv/server-calculator`.
-   Any static file server works. It can be its own site or a subfolder of an
-   existing one (all paths are relative). With Caddy:
+These steps assume a Debian/Ubuntu container (e.g. Proxmox LXC) with Caddy, and
+the app in `/srv/server-calculator`. Run them as root.
+
+1. Get the code and make sure Python 3 is there:
+
+   ```sh
+   apt install -y git python3
+   git clone https://github.com/JohnKeeg8/server-calculator.git /srv/server-calculator
+   ```
+
+2. Start the sync server as a service, so it starts on boot and restarts if it
+   ever stops:
+
+   ```sh
+   cp /srv/server-calculator/server-calculator.service /etc/systemd/system/
+   systemctl daemon-reload
+   systemctl enable --now server-calculator
+   ```
+
+   It listens on `127.0.0.1:8080` (only reachable from inside the container) and
+   keeps its data in `/var/lib/server-calculator`.
+
+3. Point Caddy at it. Replace any old `file_server` block for this app in
+   `/etc/caddy/Caddyfile` with:
 
    ```
    calc.example.com {
-       root * /srv/server-calculator
-       file_server
-       header Cache-Control "no-cache"
+       reverse_proxy 127.0.0.1:8080
    }
    ```
 
-   `Cache-Control: no-cache` makes browsers check for a newer version each time
-   the app opens. Serve it over **HTTPS** (Caddy does this automatically):
-   phones only allow offline mode and a proper home-screen install on HTTPS
-   pages (or `localhost`).
-2. Open that URL on your phone:
+   then `systemctl reload caddy`. `server.py` serves the app files itself (with
+   `Cache-Control: no-cache`, so phones pick up updates) and never serves the
+   data folder. Use **HTTPS** (Caddy does it automatically): phones only allow
+   offline mode and a proper home-screen install on HTTPS pages.
+
+4. Open the address on your phone:
    - **iPhone (Safari):** Share button → **Add to Home Screen**.
    - **Android (Chrome):** ⋮ menu → **Add to Home screen** / **Install app**.
-3. Launch it from the home-screen icon. It opens full-screen like a normal app,
+
+   Launch it from the home-screen icon. It opens full-screen like a normal app,
    which is how it is meant to be used — the layout is built phone-first.
 
-Use it from the home-screen icon rather than a browser tab: iPhones can clear
-data for websites that haven't been opened in a while, but not for apps added to
-the home screen.
+### Check it's running
 
-## Bringing over data from the old PC version
+```sh
+systemctl status server-calculator --no-pager    # should say active (running)
+curl -s http://127.0.0.1:8080/api/status         # {"ok": true, ..., "days": N}
+curl -sI https://calc.example.com/ | head -1     # HTTP/2 200
+journalctl -u server-calculator -n 30            # its log, if something is wrong
+```
 
-The old version kept everything in `data/tips.json` (with daily copies in
-`data/backups/`) in the folder you ran it from on your PC. Copy that file to your
-phone (or open the app on the PC), then **⋮ → Import backup** and pick it.
-Days, notes, and clock-in/out times all come across.
+### Bringing over older data
+
+- **Days logged in the device-only version** (the last few days) upload on
+  their own the first time you open the new version on that phone. Nothing to
+  do.
+- **The original PC version** kept everything in `data/tips.json` in the folder
+  it ran from. Either open the app and use **⋮ → Import backup** with that file,
+  or copy it straight onto the server:
+
+  ```sh
+  systemctl stop server-calculator
+  cp tips.json /var/lib/server-calculator/tips.json
+  systemctl start server-calculator
+  ```
 
 ## Run locally
 
 ```sh
-python3 -m http.server 8000
-# then open http://localhost:8000
+python3 server.py
+# then open http://localhost:8080
 ```
+
+Data goes in `./data` next to `server.py` when run this way. `PORT`, `HOST`, and
+`DATA_DIR` environment variables change the defaults.
 
 ## Using it
 
@@ -71,6 +115,7 @@ earnings report. The entry form stays out of the way until you ask for it.
 | Erase a day | Open it and press **Delete** |
 | Jump to today | **Today** button, or press `T` |
 | Change month | `‹` / `›`, or `←` / `→` |
+| Force a sync | Tap the status pill |
 | Export / import | The **⋮** menu, top right |
 
 ### Hours vs start/end
@@ -95,33 +140,62 @@ Day squares show whole dollars (`$163`) so the number fits a phone screen, and
 abbreviate past a thousand (`$1.2k`). Exact cents appear in the entry form and in
 every total.
 
-A **blue** dot in the corner of a day square means it has a note. The selected day's note is shown in the earnings
-report, so you do not have to open anything to read it.
+Dots in the corner of a day square: **blue** = it has a note,
+**amber** = not saved to the server yet. The selected day's note is shown in the
+earnings report, so you do not have to open anything to read it.
+
+## How syncing behaves
+
+- Every change saves to the device instantly, then uploads a moment later.
+- With the server unreachable you can still open the app on a device that has
+  loaded it before, keep logging shifts, and everything uploads when the server
+  comes back. The status pill shows how many days are waiting.
+- If the *same day* is edited on two devices, the **most recent edit wins** and
+  the other device is updated to match. Different days never conflict.
+- The status pill reads `Synced`, `Syncing…`, `N unsynced`, or `Offline`.
 
 ## Your data
 
-Everything lives in the browser's storage for this site, on this device only.
-Different phones, or different browsers on the same phone, each have their own
-separate copy.
+| What | Where |
+| --- | --- |
+| Live data | `/var/lib/server-calculator/tips.json` |
+| Backups | `/var/lib/server-calculator/backups/tips-YYYY-MM-DD.json` — one per day, last 30 kept |
 
-`Export backup` in the **⋮** menu downloads a plain JSON file; `Import backup`
-merges one back in (imported days replace the same dates). Importing is also
-how you move your data to another device.
+Today's backup is rewritten on every save, so the newest file is always current.
+To **restore**, `systemctl stop server-calculator`, copy a backup over
+`tips.json`, then `systemctl start server-calculator`. Back up the whole
+container (Proxmox **Backup**) or that folder to keep copies off the server.
 
-Clearing your browser's site data, or deleting the home-screen app, erases the
-data, so keep a recent export.
+`Export backup` in the app downloads a plain JSON file; `Import backup` merges
+one back in and uploads it.
+
+If `tips.json` is ever unreadable, the server renames it to
+`tips.json.unreadable-<timestamp>`, starts empty, and logs a message pointing at
+the backups. It will not silently overwrite a damaged file.
+
+## Worth knowing
+
+- **There is no password.** Anything that can reach the address can read and
+  edit your tips. Keep it on your home network or Tailscale, and don't forward
+  it to the open internet.
 
 ## Updating the app
 
-After changing `index.html`, bump `CACHE` in `sw.js` (e.g. `server-calc-v2`) so
-installed copies pick up the new version, then copy the files to the server
-again. Nothing needs restarting.
+```sh
+git -C /srv/server-calculator pull
+systemctl restart server-calculator
+```
+
+When you change `index.html`, also bump `CACHE` in `sw.js` (e.g.
+`server-calc-v3`) so installed copies pick up the new version.
 
 ## Files
 
 ```
-index.html            the whole app (calendar, editor, summaries, storage)
-sw.js                 service worker: offline support and updates
-manifest.webmanifest  home-screen app name, colors, icons
-icons/                app icons
+index.html                 the whole app (calendar, editor, summaries, sync)
+server.py                  sync server and app file host, Python standard library only
+server-calculator.service  systemd service that keeps server.py running
+sw.js                      service worker: offline support and updates
+manifest.webmanifest       home-screen app name, colors, icons
+icons/                     app icons
 ```
