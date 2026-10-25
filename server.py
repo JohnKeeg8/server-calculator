@@ -244,7 +244,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(body)))
         self.send_header('Cache-Control', 'no-store')
         self.end_headers()
-        self.wfile.write(body)
+        if self.command != 'HEAD':
+            self.wfile.write(body)
 
     def read_body(self):
         length = int(self.headers.get('Content-Length') or 0)
@@ -280,7 +281,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(body)))
         self.send_header('Cache-Control', 'no-cache')
         self.end_headers()
-        self.wfile.write(body)
+        if self.command != 'HEAD':
+            self.wfile.write(body)
 
     def do_GET(self):
         route = self.route()
@@ -295,6 +297,9 @@ class Handler(BaseHTTPRequestHandler):
         if route in STATIC:
             return self.serve_static(route)
         self.send_error(404)
+
+    def do_HEAD(self):
+        self.do_GET()   # same headers, the body is left off
 
     def do_POST(self):
         route = self.route()
