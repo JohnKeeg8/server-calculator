@@ -401,6 +401,28 @@
     opacity:0;pointer-events:none;transition:.22s;z-index:70;max-width:86vw;text-align:center;
   }
   .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  /* --------------------------------------------- cheer after logging tips */
+  .cheer{
+    position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:24px;
+    background:rgba(0,0,0,.45);opacity:0;transition:opacity .2s;
+  }
+  .cheer.show{opacity:1}
+  .cheer-card{
+    background:var(--surface);border:1px solid var(--line);border-radius:22px;
+    box-shadow:var(--shadow);padding:22px 26px 20px;text-align:center;
+    max-width:320px;width:100%;transform:scale(.85);transition:transform .25s cubic-bezier(.3,1.5,.5,1);
+  }
+  .cheer.show .cheer-card{transform:scale(1)}
+  .cheer-emoji{font-size:54px;line-height:1.1;animation:beat 1s ease-in-out infinite}
+  @keyframes beat{0%,100%{transform:scale(1)}15%{transform:scale(1.18)}30%{transform:scale(1)}45%{transform:scale(1.12)}}
+  .cheer-msg{font-size:22px;font-weight:800;letter-spacing:-.3px;margin-top:10px;line-height:1.25}
+  .cheer-amt{font-size:13px;color:var(--ink-2);margin-top:8px}
+  .cheer-amt b{color:var(--money);font-variant-numeric:tabular-nums}
+  @media (prefers-reduced-motion:reduce){
+    .cheer,.cheer-card{transition:none}
+    .cheer-emoji{animation:none}
+  }
 </style>
 </head>
 <body>
@@ -545,6 +567,14 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div class="cheer" id="cheer" hidden>
+  <div class="cheer-card">
+    <div class="cheer-emoji" id="cheerEmoji"></div>
+    <div class="cheer-msg" id="cheerMsg"></div>
+    <div class="cheer-amt" id="cheerAmt"></div>
+  </div>
+</div>
 
 <script>
 (function(){
@@ -988,12 +1018,43 @@
     }, 800);
   }
 
+  // shown after logging tips; goes through the list in order, one per save
+  var CHEERS = [
+    ["Good Job!!!", "\u2764\uFE0F"],
+    ["Make that bank", "\uD83D\uDE18"],
+    ["Now spend that money on Johnny", "\uD83D\uDE18\u2764\uFE0F"],
+    ["Woooo!", "\uD83D\uDC96"]
+  ];
+  var CHEER_KEY = "tipTracker.cheer", cheerEl = $("cheer"), cheerTimer = null;
+
+  function cheer(tips, date){
+    var i = 0;
+    try { i = (parseInt(localStorage.getItem(CHEER_KEY), 10) || 0) % CHEERS.length; } catch(e){}
+    try { localStorage.setItem(CHEER_KEY, String(i + 1)); } catch(e){}
+
+    $("cheerMsg").textContent = CHEERS[i][0];
+    $("cheerEmoji").textContent = CHEERS[i][1];
+    $("cheerAmt").innerHTML = "<b>" + money(tips) + "</b> saved for " + shortDate(fromKey(date));
+    cheerEl.hidden = false;
+    requestAnimationFrame(function(){ cheerEl.classList.add("show"); });
+    clearTimeout(cheerTimer);
+    cheerTimer = setTimeout(hideCheer, 2600);
+  }
+  function hideCheer(){
+    clearTimeout(cheerTimer);
+    cheerEl.classList.remove("show");
+    setTimeout(function(){ if(!cheerEl.classList.contains("show")) cheerEl.hidden = true; }, 220);
+  }
+  cheerEl.onclick = hideCheer;
+
   function closeSheet(save){
     clearTimeout(autoTimer);
     var date = editDate || selected;
     if(save && dirty && commit(true)) savedThisSheet = true;
     if(save && savedThisSheet){
-      toast(rec(date) ? "Saved " + shortDate(fromKey(date)) : "Cleared " + shortDate(fromKey(date)));
+      var r = rec(date);
+      if(r && r.tips > 0) cheer(r.tips, date);
+      else toast(r ? "Saved " + shortDate(fromKey(date)) : "Cleared " + shortDate(fromKey(date)));
     }
     savedThisSheet = false;
     sheetWrap.hidden = true;

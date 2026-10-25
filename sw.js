@@ -1,5 +1,5 @@
 // Bump CACHE whenever app files change so phones pick up the update.
-const CACHE = "server-calc-v3";
+const CACHE = "server-calc-v4";
 const ASSETS = [
   "./",
   "index.html",
