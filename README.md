@@ -115,7 +115,7 @@ earnings report. The entry form stays out of the way until you ask for it.
 | Erase a day | Open it and press **Delete** |
 | Jump to today | **Today** button, or press `T` |
 | Change month | `‹` / `›`, or `←` / `→` |
-| Force a sync | Tap the status pill |
+| Check for changes from other devices | Tap the status pill (it also happens on its own) |
 | Export / import | The **⋮** menu, top right |
 
 ### Hours vs start/end
@@ -141,18 +141,21 @@ abbreviate past a thousand (`$1.2k`). Exact cents appear in the entry form and i
 every total.
 
 Dots in the corner of a day square: **blue** = it has a note,
-**amber** = not saved to the server yet. The selected day's note is shown in the
+**amber** = still saving to the server. The selected day's note is shown in the
 earnings report, so you do not have to open anything to read it.
 
 ## How syncing behaves
 
-- Every change saves to the device instantly, then uploads a moment later.
+- Everything saves by itself: a moment after you stop typing, and again when the
+  form is closed. **Done** just closes the form. Each change is kept on the device
+  instantly, then uploads a moment later.
 - With the server unreachable you can still open the app on a device that has
   loaded it before, keep logging shifts, and everything uploads when the server
   comes back. The status pill shows how many days are waiting.
 - If the *same day* is edited on two devices, the **most recent edit wins** and
   the other device is updated to match. Different days never conflict.
-- The status pill reads `Synced`, `Syncing…`, `N unsynced`, or `Offline`.
+- The status pill reads `Saved`, `Saving…`, `Offline` (kept on the phone, saves
+  when the server is back), or `Not saved` (the server answered with an error).
 
 ## Your data
 
